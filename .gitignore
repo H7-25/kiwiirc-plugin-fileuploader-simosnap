@@ -1,0 +1,32 @@
+/vendor/
+/uploads/
+/uploads.db
+/fileuploader.config.toml
+
+# build artifacts
+/debug
+/plugin-fileuploader
+/fileuploader-backend
+
+# editor cruft
+/.vscode/
+
+# Private runtime data and generated packages
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+*.log
+.env
+.env.*
+/build-output/
+/release-backups/
+/reset-archives/
+/qualification/
+/qualification-packages/
+/fileuploader.toml
+*.toml.before-*
+*.pem
+*.key
