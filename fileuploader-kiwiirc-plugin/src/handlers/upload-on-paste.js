@@ -5,15 +5,12 @@ import { numLines } from '@/utils/num-lines';
 
 import * as config from '@/config.js';
 
-export function uploadOnPaste(kiwiApi, uppy, dashboard) {
+export function uploadOnPaste(kiwiApi, dashboard, openUploadDashboard) {
     return async function handleBufferPaste(event) {
         // swallow error and ignore paste if no valid buffer to share to
         try {
-            const buffer = getValidUploadTarget(kiwiApi);
-            if (config.setting('userAccountsOnly') && !buffer.getNetwork().currentUser().account) {
-                return;
-            }
-        } catch (err) {
+            getValidUploadTarget(kiwiApi);
+        } catch {
             return;
         }
 
@@ -79,7 +76,11 @@ export function uploadOnPaste(kiwiApi, uppy, dashboard) {
         }
 
         // pass event to the dashboard for handling
+        if (!openUploadDashboard()) {
+            event.preventDefault();
+            return;
+        }
+
         dashboard.handlePaste(event);
-        dashboard.openModal();
     };
 }

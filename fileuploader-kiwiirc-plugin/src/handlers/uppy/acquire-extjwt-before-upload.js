@@ -1,3 +1,5 @@
+import { isUploadAccountAllowed } from '../../open-upload-dashboard';
+
 /* global kiwi:true */
 
 const Logger = kiwi.require('libs/Logger');
@@ -9,6 +11,18 @@ export default function acquireExtjwtBeforeUpload(uppy, tokenManager) {
         const awaitingPromises = [];
 
         const files = fileIDs.map((id) => uppy.getFile(id));
+
+        const accountRequired = files.some(
+            (file) => !isUploadAccountAllowed(file?.kiwiFileUploaderTargetBuffer)
+        );
+
+        if (accountRequired) {
+            uppy.emit('fileuploader:account-required');
+
+            throw new Error(
+                'Per caricare file devi accedere a un account registrato.'
+            );
+        }
 
         Object.values(files).forEach((fileObj) => {
             const network = fileObj.kiwiFileUploaderTargetBuffer.getNetwork();

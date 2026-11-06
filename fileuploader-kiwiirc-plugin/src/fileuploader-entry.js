@@ -18,6 +18,13 @@ import instantiateUppy from './instantiate-uppy';
 import instantiateUppyLocales from './instantiate-uppy-locales';
 import TokenManager from './token-manager';
 
+import UploadAccountRequired from './components/UploadAccountRequired.vue';
+import {
+    createUploadDashboardOpener,
+    isUploadAccountAllowed
+} from './open-upload-dashboard';
+import { installUploadAccountGuard } from './install-upload-account-guard';
+
 /* global kiwi:true */
 kiwi.plugin('fileuploader', (kiwiApi, log) => {
     // default settings
@@ -38,22 +45,95 @@ kiwi.plugin('fileuploader', (kiwiApi, log) => {
         uppyOptions: config.getSetting('uppyOptions'),
     });
 
+    const AccountRequiredDialog = kiwi.Vue.extend(UploadAccountRequired);
+    const accountRequiredDialog = new AccountRequiredDialog();
+
+    accountRequiredDialog.$mount();
+    document.body.appendChild(accountRequiredDialog.$el);
+
+    let accountNoticeOpening = false;
+
+    async function showAccountRequired() {
+        if (accountNoticeOpening) {
+            return;
+        }
+
+        accountNoticeOpening = true;
+
+        try {
+            await dashboard.closeModal();
+            accountRequiredDialog.open();
+        } finally {
+            accountNoticeOpening = false;
+        }
+    }
+
+    const openUploadDashboard = createUploadDashboardOpener({
+        kiwiApi,
+        dashboard,
+        showAccountRequired,
+    });
+
+    installUploadAccountGuard({
+        kiwiApi,
+        uppy,
+        showAccountRequired,
+    });
+
+    uppy.on('fileuploader:account-required', showAccountRequired);
+
     instantiateUppyLocales(kiwiApi, uppy);
 
-    // add button to input bar
-    kiwiApi.addUi('input', UploadButton, { props: { uppyDashboard: dashboard } });
+    kiwiApi.addUi('input', UploadButton, {
+        props: { openUploadDashboard },
+    });
 
-    // add button to input bar
-    kiwiApi.addUi('input', AudioMsgButton, { props: { uppyDashboard: dashboard } });
+    kiwiApi.addUi('input', AudioMsgButton, {
+        props: { openUploadDashboard },
+    });
 
     // expose plugin api
-    kiwiApi.fileuploader = { uppy, dashboard };
+    kiwiApi.fileuploader = {
+        uppy,
+        dashboard,
+        openUploadDashboard,
+    };
 
     // show uppy modal whenever a file is dragged over the page
-    window.addEventListener('dragenter', showDashboardOnDragEnter(kiwiApi, dashboard));
+    window.addEventListener(
+        'dragenter',
+        showDashboardOnDragEnter(openUploadDashboard)
+    );
+
+    function preventGuestFileDrop(event) {
+        const types = Array.from(event.dataTransfer?.types || []);
+
+        if (!types.includes('Files')) {
+            return;
+        }
+
+        const buffer = kiwiApi.state.getActiveBuffer();
+
+        if (isUploadAccountAllowed(buffer)) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        if (event.type === 'drop') {
+            openUploadDashboard();
+        }
+    }
+
+    window.addEventListener('dragover', preventGuestFileDrop, true);
+    window.addEventListener('drop', preventGuestFileDrop, true);
 
     // show uppy modal when files are pasted
-    kiwiApi.on('buffer.paste', uploadOnPaste(kiwiApi, uppy, dashboard));
+    kiwiApi.on(
+        'buffer.paste',
+        uploadOnPaste(kiwiApi, dashboard, openUploadDashboard)
+    );
 
     kiwiApi.on('message.new', (event) => {
         const message = event.message;
